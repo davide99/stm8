@@ -4,26 +4,20 @@
 import os
 import re
 import sys
-import glob
 import shutil
 import subprocess
-from colorama import init as c_init, Fore, Back, Style
+from colorama import init as c_init, Fore
+from os.path import abspath, normpath, commonpath, basename, dirname, splitext
 
 #<configuration>
-main_src = "main.c"
-out_dir = "./out"
-cpu_f = "2000000UL"
-
+CPU_F = "2000000UL"
 CC = "/usr/local/bin/sdcc"
-CFLAGS = ["-lstm8", "-mstm8", "--std-sdcc11", "-DF_CPU=" + cpu_f]
+CFLAGS = ["-lstm8", "-mstm8", "--std-sdcc11", "-DF_CPU=" + CPU_F]
 FLASH = "/usr/local/bin/stm8flash"
 FLASHFLAGS = ["-c", "stlinkv2", "-p", "stm8s103?3"]
 #</configuraion>
 
 #please do NOT modify after this line, unless you know what you are doing
-
-#a useful var
-main_out = out_dir + "/" + main_src[:-1] + "ihx"
 
 printInfo = lambda str: print(Fore.BLUE + str)
 printVerb = lambda str: print(Fore.YELLOW + str)
@@ -34,34 +28,29 @@ def printErrAndQuit(str):
 
 
 def printUsageAndQuit(targets):
+    print("Syntax: ", end="")
+    printInfo("./make.py [target] [main_src]")
     print("Available targets are: ", end="")
     printInfo(", ".join(targets))
     quit()
 
 
-def extractPath(file):
-    path = "/".join(file.split("/")[:-1]) + "/"
-    if path == "/":
-        path = ""
-
-    return path
+replaceExtension = lambda file, ext: splitext(file)[0] + "." + ext
 
 
 def extractHeaders(filename):
-    #read whole file
-    f = open(filename, "r")
-    content = f.read()
-    f.close()
+    with open(filename, "r") as f:
+        content = f.read()
 
     #remove any /* */ and // block
     content = re.sub(r"(/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*+/)|(//.*)", "", content)
 
     #get file path
-    path = extractPath(filename)
+    path = dirname(filename) + "/"
 
     #regex to parse #include "something.h"
     pattern = re.compile(r'#include\s*"\s*([^"]+\.[Hh])\s*"')
-    s = set([path + item.lower() for item in re.findall(pattern, content)])
+    s = set([normpath(path + item.lower()) for item in re.findall(pattern, content)])
 
     for item in s:
         s = s | extractHeaders(item)    #recursion
@@ -69,93 +58,131 @@ def extractHeaders(filename):
     return s
 
 
-def mainTarget():
-    printInfo("Starting compilation...")
-    printVerb("Extracting used headers")
-    used_h = extractHeaders(main_src)   #headers used by the user
+class Maker:
+    def __init__(self, main_src="main.c"):
+        self.main_src = abspath(main_src) #starting source file
+        self.out_dir = normpath(dirname(self.main_src) + "/out") #output directory
 
-    #now every used .h (even in the stm library) should be in used_h:
-    #we need to find if there's a corresponding .c
+        #name of the generated final file
+        self.main_out = self.out_dir + "/" + replaceExtension(basename(main_src), "ihx")
 
-    rel_list = []
+        self.targets = {
+            "main"  : [self._mainTarget, lambda: self._cleanTarget(True)],
+            "clean" : [self._cleanTarget],
+            "flash" : [self._mainTarget, self._flashTarget, self._cleanTarget]
+        }
 
-    for h in used_h:
-        c_file = h[:-1] + "c"
 
-        if os.path.exists(c_file):
-            printVerb("Compiling " + c_file)
-            out_path = out_dir + "/" + extractPath(c_file)
-            out_rel = out_dir + "/" + h[:-1] + "rel"
+    def getAvailableTargets(self):
+        return self.targets.keys()
 
-            os.makedirs(out_path, exist_ok=True)
 
-            l=[CC]
-            l.extend(CFLAGS)
-            l.extend(["-c", c_file, "-o", out_rel])
+    def execTarget(self, targetStr="main"):
+        if targetStr.lower() not in self.targets:
+            printErrAndQuit("Target not defined")
 
-            if subprocess.call(l) != 0:
-                printErrAndQuit("Non-zero returned during compilation of " + c_file)
+        for item in self.targets[targetStr.lower()]:
+            item()
+            if item != self.targets[targetStr.lower()][-1]:
+                print()
 
-            rel_list.append(out_rel)
 
-    #ok, every non main file is compiled, now compile main.c
-    l = [CC]
-    l.extend(CFLAGS)
-    l.extend(["--out-fmt-ihx", "-o", main_out, main_src])
-    l.extend(rel_list)
+    def _mainTarget(self):
+        printInfo("Starting compilation...")
+        printVerb("Extracting used headers")
+        used_h = extractHeaders(self.main_src)   #headers used by the user
 
-    if subprocess.call(l) != 0:
-        printErrAndQuit("Non-zero returned during compilation of " + main_src)
+        #now every used .h (even in the stm library) should be in used_h:
+        #we need to find if there's a corresponding .c
 
-    printInfo("Done compiling\n")
+        rel_list = []
+
+        for h in used_h:
+            c_file = replaceExtension(h, "c")
+
+            if os.path.exists(c_file):
+                printVerb("Compiling " + c_file)
+                out_rel = normpath(self.out_dir + "/" + c_file[len(commonpath([self.out_dir, c_file])):])
+                out_rel = replaceExtension(out_rel, "rel")
+                out_path = normpath(dirname(out_rel))
+
+                os.makedirs(out_path, exist_ok=True)
+
+                l=[CC]
+                l.extend(CFLAGS)
+                l.extend(["-c", c_file, "-o", out_rel])
+
+                if subprocess.call(l) != 0:
+                    printErrAndQuit("Non-zero returned during compilation of " + c_file)
+
+                rel_list.append(out_rel)
+
+        #ok, every non main file is compiled, now compile main.c
+        l = [CC]
+        l.extend(CFLAGS)
+        l.extend(["--out-fmt-ihx", "-o", self.main_out, self.main_src])
+        l.extend(rel_list)
+
+        if subprocess.call(l) != 0:
+            printErrAndQuit("Non-zero returned during compilation of " + self.main_src)
+
+        printInfo("Done compiling")
     
 
-def cleanTarget(leaveMain=False):
-    printInfo("Cleaning...")
-    printVerb("Preseving " + main_out)
+    def _cleanTarget(self, leaveMain=False):
+        printInfo("Cleaning...")
 
-    if leaveMain:
-        os.rename(main_out, "./123" + main_src[:-1] + "ihx")
+        if leaveMain:
+            printVerb("Preseving " + self.main_out)
+            tempFile = self.main_out.split("/")
+            tempFile.insert(len(tempFile)-1, "..")
+            tempFile = normpath("/".join(tempFile))
+            os.rename(self.main_out, tempFile)
 
-    printVerb("Removing " + out_dir)
-    shutil.rmtree(out_dir, ignore_errors=True)
+        printVerb("Removing " + self.out_dir)
+        shutil.rmtree(self.out_dir, ignore_errors=True)
 
-    if leaveMain:
-        os.mkdir(out_dir)
-        os.rename("./123" + main_src[:-1] + "ihx", main_out)
+        if leaveMain:
+            os.mkdir(self.out_dir)
+            os.rename(tempFile, self.main_out)
 
-    printInfo("Done cleaning\n")
-    
+        printInfo("Done cleaning")
+        
 
-def flashTarget():
-    printInfo("Starting flashing...")
-    l = [FLASH]
-    l.extend(FLASHFLAGS)
-    l.extend(["-w", main_out])
+    def _flashTarget(self):
+        printInfo("Starting flashing...")
+        l = [FLASH]
+        l.extend(FLASHFLAGS)
+        l.extend(["-w", self.main_out])
 
-    if subprocess.call(l) != 0:
-        printErrAndQuit("Non-zero returned during flash")
-    printInfo("Done flashing\n")
+        if subprocess.call(l) != 0:
+            printErrAndQuit("Non-zero returned during flash")
+        printInfo("Done flashing")
 
 
 def main():
     #Colorama initialization
     c_init(autoreset=True)
 
-    targets = {
-        "main"  : [mainTarget, lambda: cleanTarget(True)],
-        "clean" : [cleanTarget],
-        "flash" : [mainTarget, flashTarget, cleanTarget]
-    }
+    #if 0 parameteres are passed, then use all deafult vaules
+    if len(sys.argv) == 1:
+        maker = Maker()
+        maker.execTarget()
 
-    if len(sys.argv) == 1:  #go with the default target
-        sys.argv.append("main")
+    #if 1 parameter is passed, we assume that it's a target
+    elif len(sys.argv) == 2:
+        maker = Maker()
 
-    if (len(sys.argv) != 2) or (sys.argv[1].lower() not in targets):
-        printUsageAndQuit(targets.keys())
-
-    for item in targets[sys.argv[1].lower()]:
-        item()
+        if sys.argv[1].lower()=="--help":
+            printUsageAndQuit(maker.getAvailableTargets())
+        else:
+            maker.execTarget(sys.argv[1])
+    
+    #if 2 parameters are passed, we assume that the first is
+    #the target, the second is the main_src
+    elif len(sys.argv) == 3:
+        maker = Maker(main_src=sys.argv[2])
+        maker.execTarget(sys.argv[1])
 
 
 if __name__ == "__main__":

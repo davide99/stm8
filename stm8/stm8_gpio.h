@@ -1,3 +1,6 @@
+#ifndef STM8_GPIO_H
+#define STM8_GPIO_H
+
 //Port A
 #define PA_ODR __RMM(0x00)
 #define PA_IDR __RMM(0x01)
@@ -25,3 +28,5 @@
 #define PD_DDR __RMM(0x11)
 #define PD_CR1 __RMM(0x12)
 #define PD_CR2 __RMM(0x13)
+
+#endif

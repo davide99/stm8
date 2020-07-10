@@ -4,6 +4,9 @@
  * Davide Pisanò
  */
 
+#ifndef STM8_H
+#define STM8_H
+
 #ifndef __SDCC
     #error Plase use sdcc
 #endif
@@ -21,3 +24,6 @@
 void delay(uint16_t);
 
 #include "stm8_gpio.h"
+#include "stm8_timer.h"
+
+#endif

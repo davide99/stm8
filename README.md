@@ -7,7 +7,7 @@ Requirements
 ------------
 
 1. git
-2. Python 3
+2. Python >= 3.5
 
 Quick start
 -----------
