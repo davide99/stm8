@@ -12,9 +12,10 @@ from colorama import init as c_init, Fore, Back, Style
 #<configuration>
 main_src = "main.c"
 out_dir = "./out"
+cpu_f = "2000000UL"
 
 CC = "/usr/local/bin/sdcc"
-CFLAGS = ["-lstm8", "-mstm8", "--std-sdcc11"]
+CFLAGS = ["-lstm8", "-mstm8", "--std-sdcc11", "-DF_CPU=" + cpu_f]
 FLASH = "/usr/local/bin/stm8flash"
 FLASHFLAGS = ["-c", "stlinkv2", "-p", "stm8s103?3"]
 #</configuraion>

@@ -1,9 +1,4 @@
-#define F_CPU 2000000UL
 #include "stm8/stm8.h"
-
-/*
-    #include "stm8/stm8_uart.h"
-    */
 
 #define LED_PIN 3
 
