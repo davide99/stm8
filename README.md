@@ -12,7 +12,8 @@ Requirements
 Quick start
 -----------
 
-* `$ git clone https://github.com/davide99/stm8.git`
-* `$ cd stm8`
-* `$ pip3 install colorama`
+*TODO*: add configure.py
+
 * `$ sudo chmod +x make.py`
+* `$ ./make.py`
+* Done
