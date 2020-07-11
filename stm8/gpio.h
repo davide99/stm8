@@ -1,6 +1,8 @@
 #ifndef STM8_GPIO_H
 #define STM8_GPIO_H
 
+#include "common.h"
+
 //Port A
 #define PA_ODR __RMM(0x00)
 #define PA_IDR __RMM(0x01)

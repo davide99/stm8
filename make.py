@@ -123,6 +123,10 @@ class Maker:
         l.extend(["--out-fmt-ihx", "-o", self.main_out, self.main_src])
         l.extend(rel_list)
 
+        #BUG correction: if we never enter in the for loop above, out_dir
+        #doesn't exist. Let's make it
+        os.makedirs(self.out_dir, exist_ok=True)
+
         if subprocess.call(l) != 0:
             printErrAndQuit("Non-zero returned during compilation of " + self.main_src)
 
