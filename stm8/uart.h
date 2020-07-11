@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-//UART1
+//UART1 d5->tx, d6->rx
 #define UART1_SR   __RMM(0x230)
 #define UART1_DR   __RMM(0x231)
 #define UART1_BRR1 __RMM(0x232)
