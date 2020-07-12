@@ -68,6 +68,7 @@ class Maker:
 
         self.targets = {
             "main"  : [self._mainTarget, lambda: self._cleanTarget(True)],
+            "jmain" : [self._mainTarget],
             "clean" : [self._cleanTarget],
             "flash" : [self._mainTarget, self._flashTarget, self._cleanTarget]
         }

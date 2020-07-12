@@ -5,8 +5,8 @@
 #endif
 
 inline void delay(uint16_t ms){
-    uint32_t i;
+    uint32_t t = (F_CPU/11000UL)*ms;
 
-    for(i = 0; i<(F_CPU/18000UL)*ms; i++)
-        __asm__("nop");
+    while(t)
+        t--;
 }
