@@ -15,15 +15,14 @@
 #define SPI_CR1_SPE  0x40
 #define SPI_CR2_SSM  0x02 //<<CS managed in SW
 #define SPI_CR2_SSI  0x01
-#define SPI_CR2_BDM  0x80 //<<bidirectional on single line
-#define SPI_CR2_BDOE 0x40 //<<direction select
+#define SPI_SR_BSY   0x80
 #define SPI_SR_TXE   0x02
 #define SPI_SR_RXNE  0x01
 
 
-void    spi_init();
-void    spi_write(uint8_t);
-uint8_t spi_read();
+void    spi_begin_transaction();
+uint8_t spi_transfer(uint8_t);
+void    spi_end_transaction();
 
 
 #endif

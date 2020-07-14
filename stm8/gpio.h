@@ -31,4 +31,14 @@
 #define PD_CR1 __RMM(0x12)
 #define PD_CR2 __RMM(0x13)
 
+//ISR
+#define PA_ISR 3
+#define PB_ISR 4
+#define PC_ISR 5
+#define PD_ISR 6
+
+//Interrupt config registers
+#define EXTI_CR1 __RMM(0x0A0)
+#define EXTI_CR2 __RMM(0x0A1)
+
 #endif
