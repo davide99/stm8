@@ -7,9 +7,6 @@
 inline void uart1_init(uint16_t baudrate, int8_t rx_isr_en){
     uint16_t uart_div;
 
-    if (rx_isr_en)
-        __asm__("rim");
-
     //divide F_CPU by baudrate with "rounding"
     uart_div = (F_CPU + (baudrate>>1u))/baudrate;
     
@@ -19,6 +16,9 @@ inline void uart1_init(uint16_t baudrate, int8_t rx_isr_en){
 
     //Enable RX, TX and RX interrupt
     UART1_CR2 = (rx_isr_en ? UART1_CR2_RIEN : 0) | UART1_CR2_TEN | UART1_CR2_REN;
+
+    if (rx_isr_en)
+        __asm__("rim");
 }
 
 void uart1_write(uint8_t data){

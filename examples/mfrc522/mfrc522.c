@@ -1,11 +1,9 @@
 #include "mfrc522.h"
 #include "../../stm8/gpio.h"
+#include "../../stm8/spi.h"
 #include "../../stm8/util.h" //delay()
 
-#define CS_PIN                  4 //C
-#define IRQ_PIN                 4 //D
-
-#define PCD_RESETPHASE          0x0F
+#define PCD_RESETPHASE          0x0Fu
 
 #define MFRC522_REG_COMMAND	    0x01u << 1u
 #define MFRC522_REG_COM_I_EN    0x02u << 1u
@@ -25,10 +23,10 @@
 
 void mfrc522_write_register(uint8_t reg, uint8_t val){
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(CS_PIN); //low
+    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
     spi_transfer(reg);
     spi_transfer(val);
-    PC_ODR |= SHIFTL8(CS_PIN); //high
+    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
     spi_end_transaction();
 }
 
@@ -36,10 +34,10 @@ uint8_t mfrc522_read_register(uint8_t reg){
     uint8_t temp;
 
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(CS_PIN); //low
+    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
     spi_transfer(reg | 0x80u);
     temp = spi_transfer(0);
-    PC_ODR |= SHIFTL8(CS_PIN); //high
+    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
     spi_end_transaction();
 
     return temp;
@@ -77,10 +75,9 @@ inline uint8_t mfrc522_get_version(){
 }
 
 inline void mfrc522_init(){
-    PC_DDR |= SHIFTL8(CS_PIN); //output
-    PC_CR1 |= SHIFTL8(CS_PIN); //pushpull
-    PC_ODR |= SHIFTL8(CS_PIN); //high
-
+    PC_DDR |= SHIFTL8(MFRC522_CS_PIN); //output
+    PC_CR1 |= SHIFTL8(MFRC522_CS_PIN); //pushpull
+    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
 
     mfrc522_reset();
     mfrc522_write_register(MFRC522_REG_TX_MODE, 0);
@@ -102,9 +99,9 @@ inline void mfrc522_init(){
 }
 
 inline void mfrc522_init_interrupt(){
-    PD_DDR &= ~SHIFTL8(IRQ_PIN);   //input
-    PD_CR1 |= SHIFTL8(IRQ_PIN);     //pullup
-    PD_CR2 = SHIFTL8(IRQ_PIN);     //enable external interrupt
+    PD_DDR &= ~SHIFTL8(MFRC522_IRQ_PIN);    //input
+    PD_CR1 |=  SHIFTL8(MFRC522_IRQ_PIN);    //pullup
+    PD_CR2  =  SHIFTL8(MFRC522_IRQ_PIN);    //enable external interrupt
 
     EXTI_CR1 |= 0b10000000; //<=+
     EXTI_CR1 &= 0b10111111; //<== interrupt on falling edge only
@@ -115,7 +112,11 @@ inline void mfrc522_init_interrupt(){
     __asm__("rim");
 }
 
-inline void do_something(){
+inline void mfrc522_interrupt_clear(){
+    mfrc522_write_register(MFRC522_REG_COM_IRQ, 0x7Fu);
+}
+
+inline void mfrc522_interrupt_reactivate_reception(){
     mfrc522_write_register(0x09u << 1u, 0x26u);
     mfrc522_write_register(MFRC522_REG_COMMAND, 0x0Cu);
     mfrc522_write_register(0x0Du << 1u, 0x87u);

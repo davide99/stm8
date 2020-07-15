@@ -98,6 +98,18 @@ class Maker:
 
         rel_list = []
 
+        #workaround, this might need to be fixed. Since a c of an header
+        #might contain an include, also that include need to be parsed
+        tmp_set = set() #set can't be changed during iteration
+
+        for h in used_h:
+            c_file = replaceExtension(h, "c")
+
+            if os.path.exists(c_file):
+                tmp_set |= extractHeaders(c_file)
+
+        used_h |= tmp_set
+
         for h in used_h:
             c_file = replaceExtension(h, "c")
 
