@@ -4,9 +4,11 @@
 #define F_CPU 2000000UL
 #endif
 
-inline void uart1_init(uint16_t baudrate, int rx_isr_en){
+inline void uart1_init(uint16_t baudrate, int8_t rx_isr_en){
     uint16_t uart_div;
-    __asm__("rim");
+
+    if (rx_isr_en)
+        __asm__("rim");
 
     //divide F_CPU by baudrate with "rounding"
     uart_div = (F_CPU + (baudrate>>1u))/baudrate;

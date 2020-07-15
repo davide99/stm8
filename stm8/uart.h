@@ -22,7 +22,7 @@
 #define UART1_RX_FULL_ISR 18
 
 
-void    uart1_init(uint16_t, int);
+void    uart1_init(uint16_t, int8_t);
 void    uart1_write(uint8_t);
 uint8_t uart1_read();
 
