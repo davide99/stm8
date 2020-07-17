@@ -3,45 +3,46 @@
 #include "../../stm8/spi.h"
 #include "../../stm8/util.h" //sleep
 
+#define SLAVE_SELECT()  (PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN))
+#define SLAVE_RELEASE() (PC_ODR |= SHIFTL8(MFRC522_CS_PIN))
+
 inline uint8_t PCD_GetVersion(){
     return PCD_ReadRegister(VersionReg);
 }
 
 void PCD_WriteRegister(uint8_t reg, uint8_t value){
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
+    SLAVE_SELECT();
     spi_transfer(reg);
     spi_transfer(value);
-    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
+    SLAVE_RELEASE();
     spi_end_transaction();
 }
 
 void PCD_WriteRegisterMany(uint8_t reg, uint8_t count, uint8_t *values){
-    uint8_t i;
-
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
+    SLAVE_SELECT();
     spi_transfer(reg);
 
-    for(i=0; i<count; i++){
+    for(uint8_t i=0; i<count; i++){
         spi_transfer(values[i]);
     }
 
-    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
+    SLAVE_RELEASE();
     spi_end_transaction();
 }
 
 uint8_t PCD_ReadRegister(uint8_t reg){
-    uint8_t temp;
+    uint8_t value;
 
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
+    SLAVE_SELECT();
     spi_transfer(reg | 0x80u);
-    temp = spi_transfer(0);
-    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
+    value = spi_transfer(0);
+    SLAVE_RELEASE();
     spi_end_transaction();
 
-    return temp;
+    return value;
 }
 
 void PCD_ReadRegisterMany(uint8_t reg, uint8_t count, uint8_t *values, uint8_t rxAlign){
@@ -54,7 +55,7 @@ void PCD_ReadRegisterMany(uint8_t reg, uint8_t count, uint8_t *values, uint8_t r
     reg |= 0x80u;               // MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
     index = 0;                  // Index in values array.
     spi_begin_transaction();
-    PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN); //low
+    SLAVE_SELECT();
     count--;                    // One read is performed outside of the loop
     spi_transfer(reg);          // Tell MFRC522 which address we want to read
 
@@ -74,7 +75,7 @@ void PCD_ReadRegisterMany(uint8_t reg, uint8_t count, uint8_t *values, uint8_t r
 	}
 	values[index] = spi_transfer(0);       // Read the final byte. Send 0 to stop reading.
 
-    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
+    SLAVE_RELEASE();
     spi_end_transaction();
 }
 
@@ -114,7 +115,7 @@ static inline void PCD_AntennaOn(){
 inline void PCD_Init(){
     PC_DDR |= SHIFTL8(MFRC522_CS_PIN); //output
     PC_CR1 |= SHIFTL8(MFRC522_CS_PIN); //pushpull
-    PC_ODR |= SHIFTL8(MFRC522_CS_PIN); //high
+    SLAVE_RELEASE();
 
     //Soft reset
     PCD_Reset();
@@ -203,11 +204,11 @@ uint8_t PCD_CommunicateWithPICC(
     uint8_t *backLen,   //< In: Max number of bytes to write to *backData. Out: The number of uint8_ts returned.
     uint8_t *validBits, //< In/Out: The number of valid bits in the last byte. 0 for 8 valid bits.
     uint8_t rxAlign,    //< In: Defines the bit position in backData[0] for the first bit received.
-    int8_t checkCRC){   //< In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
+    int8_t  checkCRC){  //< In: True => The last two bytes of the response is assumed to be a CRC_A that must be validated.
 
     //Prepare values for BitFramingReg
     uint8_t txLastBits = validBits ? *validBits : 0;
-    uint8_t bitFraming = (rxAlign << 4) + txLastBits;
+    uint8_t bitFraming = (rxAlign << 4u) + txLastBits;
 
     PCD_WriteRegister(CommandReg, PCD_Idle);                //Stop any active command.
     PCD_WriteRegister(ComIrqReg, 0x7Fu);                    //Clear all seven interrupt request bits
@@ -234,14 +235,14 @@ uint8_t PCD_CommunicateWithPICC(
         }
     }
     // 35.7ms and nothing happend. Communication with the MFRC522 might be down.
-    if (i == 0) {
+    if (!i) {
         return STATUS_TIMEOUT;
     }
     
     // Stop now if any errors except collisions were detected.
     // ErrorReg[7..0] bits are: WrErr TempErr reserved BufferOvfl CollErr CRCErr ParityErr ProtocolErr
     uint8_t errorRegValue = PCD_ReadRegister(ErrorReg);
-    if (errorRegValue & 0x13) {  // BufferOvfl ParityErr ProtocolErr
+    if (errorRegValue & 0x13u) {  // BufferOvfl ParityErr ProtocolErr
         return STATUS_ERROR;
     }
   
@@ -268,7 +269,8 @@ uint8_t PCD_CommunicateWithPICC(
     if (errorRegValue & 0x08u) {     // CollErr
         return STATUS_COLLISION;
     }
-    
+
+#ifndef MFRC522_DISABLE_CRC_CHECK_IN_COMMUNICATEWITHPICC
     // Perform CRC_A validation if requested.
     if (backData && backLen && checkCRC) {
         // In this case a MIFARE Classic NAK is not OK.
@@ -289,8 +291,9 @@ uint8_t PCD_CommunicateWithPICC(
             return STATUS_CRC_WRONG;
         }
     }
-    return STATUS_OK;
+#endif
 
+    return STATUS_OK;
 }
 
 uint8_t PICC_HaltA() {
@@ -338,7 +341,7 @@ uint8_t PICC_HaltA() {
  * 
  * @return STATUS_OK on success, STATUS_??? otherwise.
  */
-uint8_t PICC_Select(Uid *uid) { //< Pointer to Uid struct
+uint8_t PICC_Select(MFRC522_Uid *uid) { //< Pointer to MFRC522_Uid struct
     int8_t uidComplete, selectDone;
     uint8_t cascadeLevel = 1;
     uint8_t result;
@@ -451,7 +454,7 @@ uint8_t PICC_Select(Uid *uid) { //< Pointer to Uid struct
                 if (valueOfCollReg & 0x20u) { // CollPosNotValid
                     return STATUS_COLLISION; // Without a valid collision position we cannot continue
                 }
-                uint8_t collisionPos = valueOfCollReg & 0x1Fu; // Values 0-31, 0 means bit 32.
+                int8_t collisionPos = (int8_t)(valueOfCollReg & 0x1Fu); // Values 0-31, 0 means bit 32.
                 if (collisionPos == 0) {
                     collisionPos = 32;
                 }
@@ -504,7 +507,7 @@ uint8_t PICC_Select(Uid *uid) { //< Pointer to Uid struct
             cascadeLevel++;
         } else {
             uidComplete = 1;
-            uid->sak = responseBuffer[0];
+            //uid->sak = responseBuffer[0]; let's save some bytes
         }
     }while(!uidComplete); // End of while (!uidComplete)
 
@@ -514,7 +517,7 @@ uint8_t PICC_Select(Uid *uid) { //< Pointer to Uid struct
     return STATUS_OK;
 }
 
-int8_t PICC_ReadCardSerial(Uid* uid){
+int8_t PICC_ReadCardSerial(MFRC522_Uid* uid){
 	return (PICC_Select(uid) == STATUS_OK);
 }
 

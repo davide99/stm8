@@ -11,16 +11,11 @@
     #define MFRC522_IRQ_PIN         4 //Port D
 #endif
 
-//Maximum UID size
-#define UID_MAX_SIZE          10
+//#define MFRC522_DISABLE_CRC_CHECK_IN_COMMUNICATEWITHPICC
+
 
 //Described in 9.3.3.6 / table 98 of the datasheet at http://www.nxp.com/documents/data_sheet/MFRC522.pdf
-#define PCD_RX_MAX_GAIN       0x07u << 4u
-
-// The MIFARE Classic uses a 4 bit ACK/NAK. Any other value than 0xA is NAK.
-#define MF_ACK                0xAu
-// A Mifare Crypto1 key is 6 bytes.
-#define MF_KEY_SIZE           6u
+#define PCD_RX_MAX_GAIN       0x70u
 
 //MFRC522 registers. Described in charapter 9 of the datasheet
 //When using SPI all addresses are shifted one bit left in the "SPI address byte" (section 8.1.2.3)
@@ -124,22 +119,6 @@ enum PICC_Command {
     // The PICC_CMD_MF_READ and PICC_CMD_MF_WRITE can also be used for MIFARE Ultralight.
     PICC_CMD_UL_WRITE       = 0xA2u         // Writes one 4 byte page to the PICC.
 };
-    
-// PICC types we can detect. Remember to update PICC_GetTypeName() if you add more.
-// last value set to 0xff, then compiler uses less ram, it seems some optimisations are triggered
-enum PICC_Type {
-    PICC_TYPE_UNKNOWN,
-    PICC_TYPE_ISO_14443_4,          // PICC compliant with ISO/IEC 14443-4 
-    PICC_TYPE_ISO_18092,            // PICC compliant with ISO/IEC 18092 (NFC)
-    PICC_TYPE_MIFARE_MINI,          // MIFARE Classic protocol, 320 bytes
-    PICC_TYPE_MIFARE_1K,            // MIFARE Classic protocol, 1KB
-    PICC_TYPE_MIFARE_4K,            // MIFARE Classic protocol, 4KB
-    PICC_TYPE_MIFARE_UL,            // MIFARE Ultralight or Ultralight C
-    PICC_TYPE_MIFARE_PLUS,          // MIFARE Plus
-    PICC_TYPE_MIFARE_DESFIRE,       // MIFARE DESFire
-    PICC_TYPE_TNP3XXX,              // Only mentioned in NXP AN 10833 MIFARE Type Identification Procedure
-    PICC_TYPE_NOT_COMPLETE = 0xff   // SAK indicates UID is not complete.
-};
 
 // Return codes from the functions in this library.
 // Last value set to 0xff, then compiler uses less ram, it seems some optimisations are triggered
@@ -152,16 +131,16 @@ enum StatusCode {
     STATUS_INTERNAL_ERROR,          // Internal error in the code. Should not happen ;-)
     STATUS_INVALID,                 // Invalid argument.
     STATUS_CRC_WRONG,               // The CRC_A does not match
-    STATUS_MIFARE_NACK = 0xff       // A MIFARE PICC responded with NAK.
+    STATUS_MIFARE_NACK = 0xFFu      // A MIFARE PICC responded with NAK.
 };
 
 
 // A struct used for passing the UID of a PICC.
 typedef struct {
-    uint8_t size;			// Number of bytes in the UID. 4, 7 or 10.
+    uint8_t size;           // Number of bytes in the UID. 4, 7 or 10.
     uint8_t	uidByte[10];
-    uint8_t sak;			// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
-} Uid;
+    //uint8_t sak;          // The SAK (Select acknowledge) byte returned from the PICC after successful selection.
+} MFRC522_Uid;
 
 // Codes for writing to registers.
 void PCD_WriteRegister(uint8_t reg, uint8_t value);
@@ -180,8 +159,8 @@ void    PCD_InitInterrupt();
 void    PCD_ClearInterrupt();
 void    PCD_InterruptReactivateReception();
 uint8_t PCD_GetVersion();
-uint8_t PICC_Select(Uid *uid);
-int8_t  PICC_ReadCardSerial(Uid* uid);
+uint8_t PICC_Select(MFRC522_Uid *uid);
+int8_t  PICC_ReadCardSerial(MFRC522_Uid* uid);
 uint8_t PICC_HaltA();
 uint8_t PCD_CalculateCRC(uint8_t *data, uint8_t length, uint8_t* result);
 uint8_t PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen, uint8_t *validBits, uint8_t rxAlign, int8_t checkCRC);

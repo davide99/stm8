@@ -18,8 +18,7 @@ void isr_port_d(void) __interrupt(PD_ISR){
 
 void main(){
     flag = 0;
-    Uid uid;
-    uid.size = 1;
+    MFRC522_Uid uid;
     
     uart1_init(9600, 0);
     printf("uart initialized\n");
@@ -34,13 +33,11 @@ void main(){
 
     while(1){
         if(flag){
-            printf("interrupt\n");
-            uint8_t a = PICC_ReadCardSerial(&uid);
-
-            printf(">%d, %d<\n", uid.size, a);
-
-            for(int i = 0; i<uid.size; i++)
-                printf("%x ", uid.uidByte[i]);
+            if(PICC_ReadCardSerial(&uid)){
+                for(uint8_t i = 0; i<uid.size; i++){
+                    printf("%X ", uid.uidByte[i]);
+                }
+            }
 
             printf("\n");
 
