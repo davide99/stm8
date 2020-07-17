@@ -149,42 +149,6 @@ inline void PCD_Init(){
     PCD_WriteRegister(RFCfgReg, PCD_RX_MAX_GAIN);
 }
 
-uint8_t PICC_REQA_or_WUPA(uint8_t command, uint8_t *bufferATQA, uint8_t *bufferSize){
-    uint8_t validBits, status;
-
-    if(!bufferATQA || *bufferSize < 2){
-        return STATUS_NO_ROOM;
-    }
-
-    //ValuesAfterColl=1 => Bits received after collision are cleared.
-    PCD_ClearRegisterBitMask(CollReg, 0x80u);
-    validBits = 7;
-    /*
-     * For REQA and WUPA we need the short frame format - transmit only 7 bits of the last (and only) uint8_t.
-     * TxLastBits = BitFramingReg[2..0]
-     */
-    status = PCD_TransceiveData(&command, 1, bufferATQA, bufferSize, &validBits, 0, 0);
-
-    if(status != STATUS_OK){
-        return status;
-    }
-
-    // ATQA must be exactly 16 bits.
-    if(*bufferSize != 2 || validBits){
-        return STATUS_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-uint8_t PICC_RequestA(uint8_t *bufferATQA, uint8_t *bufferSize){
-    return PICC_REQA_or_WUPA(PICC_CMD_REQA, bufferATQA, bufferSize);
-}
-
-uint8_t PICC_WakeupA(uint8_t *bufferATQA, uint8_t *bufferSize){
-    return PICC_REQA_or_WUPA(PICC_CMD_WUPA, bufferATQA, bufferSize);
-}
-
 uint8_t PCD_TransceiveData(uint8_t *sendData, uint8_t sendLen, uint8_t *backData, uint8_t *backLen, uint8_t *validBits, uint8_t rxAlign, int8_t checkCRC){
     return PCD_CommunicateWithPICC(PCD_Transceive, 0x30u, sendData, sendLen, backData, backLen, validBits, rxAlign, checkCRC);
     //                                               ^-- RxIRq and IdleIRq
