@@ -6,7 +6,7 @@ import sys
 import shutil
 import subprocess
 from os import mkdir, makedirs, rename
-from colorama import init as c_init, Fore
+from colorama import init as cInit, Fore
 from os.path import abspath, normpath, commonpath, basename, dirname, splitext, exists
 
 #<configuration>
@@ -59,10 +59,10 @@ def getUsedFilesFromFile(filename):
     c = set()
 
     for f in h:
-        c_file = replaceExtension(f, "c")
+        cFile = replaceExtension(f, "c")
 
-        if exists(c_file):  #there exists an associated .c file?
-            c.add(c_file)
+        if exists(cFile):  #there exists an associated .c file?
+            c.add(cFile)
             
     return h | c
 
@@ -75,9 +75,9 @@ def getUsedCFiles(startingFile):
     toBeAnalyzed = set()    #files to be analyzed
     
     while True:
+        printVerb("Found " + currentFile)
         completed.add(currentFile)  #analyze the file
         if currentFile in toBeAnalyzed:
-            printInfo("Found " + currentFile)
             toBeAnalyzed.remove(currentFile)
 
         #get used files
@@ -101,12 +101,12 @@ def getUsedCFiles(startingFile):
 
 
 class Maker:
-    def __init__(self, main_src="main.c"):
-        self.main_src = abspath(main_src) #starting source file
-        self.out_dir = normpath(dirname(self.main_src) + "/out") #output directory
+    def __init__(self, mainSrc="main.c"):
+        self.mainSrc = abspath(mainSrc) #starting source file
+        self.outDir = normpath(dirname(self.mainSrc) + "/out") #output directory
 
         #name of the generated final file
-        self.main_out = self.out_dir + "/" + replaceExtension(basename(main_src), "ihx")
+        self.mainOut = self.outDir + "/" + replaceExtension(basename(mainSrc), "ihx")
 
         self.targets = {
             "main"  : [self._mainTarget, lambda: self._cleanTarget(True)],
@@ -133,40 +133,40 @@ class Maker:
     def _mainTarget(self):
         printInfo("Starting compilation...")
         printVerb("Extracting used headers")
-        used_c = getUsedCFiles(self.main_src)
+        usedC = getUsedCFiles(self.mainSrc)
         #now every used .c (even in the stm library) should be in used_c
 
-        rel_list = []
+        relList = []
 
-        for c_file in used_c:
-            printVerb("Compiling " + c_file)
-            out_rel = normpath(self.out_dir + "/" + c_file[len(commonpath([self.out_dir, c_file])):])
-            out_rel = replaceExtension(out_rel, "rel")
-            out_path = normpath(dirname(out_rel))
+        for cFile in usedC:
+            printVerb("Compiling " + cFile)
+            outRel = normpath(self.outDir + "/" + cFile[len(commonpath([self.outDir, cFile])):])
+            outRel = replaceExtension(outRel, "rel")
+            outPath = normpath(dirname(outRel))
 
-            makedirs(out_path, exist_ok=True)
+            makedirs(outPath, exist_ok=True)
 
             l=[CC]
             l.extend(CFLAGS)
-            l.extend(["-c", c_file, "-o", out_rel])
+            l.extend(["-c", cFile, "-o", outRel])
 
             if subprocess.call(l) != 0:
-                printErrAndQuit("Non-zero returned during compilation of " + c_file)
+                printErrAndQuit("Non-zero returned during compilation of " + cFile)
 
-            rel_list.append(out_rel)
+            relList.append(outRel)
 
         #ok, every non main file is compiled, now compile main.c
         l = [CC]
         l.extend(CFLAGS)
-        l.extend(["--out-fmt-ihx", "-o", self.main_out, self.main_src])
-        l.extend(rel_list)
+        l.extend(["--out-fmt-ihx", "-o", self.mainOut, self.mainSrc])
+        l.extend(relList)
 
         #BUG correction: if we never enter in the for loop above, out_dir
         #doesn't exist. Let's make it
-        makedirs(self.out_dir, exist_ok=True)
+        makedirs(self.outDir, exist_ok=True)
 
         if subprocess.call(l) != 0:
-            printErrAndQuit("Non-zero returned during compilation of " + self.main_src)
+            printErrAndQuit("Non-zero returned during compilation of " + self.mainSrc)
 
         printInfo("Done compiling")
     
@@ -175,18 +175,18 @@ class Maker:
         printInfo("Cleaning...")
 
         if leaveMain:
-            printVerb("Preseving " + self.main_out)
-            tempFile = self.main_out.split("/")
+            printVerb("Preseving " + self.mainOut)
+            tempFile = self.mainOut.split("/")
             tempFile.insert(len(tempFile)-1, "..")
             tempFile = normpath("/".join(tempFile))
-            rename(self.main_out, tempFile)
+            rename(self.mainOut, tempFile)
 
-        printVerb("Removing " + self.out_dir)
-        shutil.rmtree(self.out_dir, ignore_errors=True)
+        printVerb("Removing " + self.outDir)
+        shutil.rmtree(self.outDir, ignore_errors=True)
 
         if leaveMain:
-            mkdir(self.out_dir)
-            rename(tempFile, self.main_out)
+            mkdir(self.outDir)
+            rename(tempFile, self.mainOut)
 
         printInfo("Done cleaning")
         
@@ -195,7 +195,7 @@ class Maker:
         printInfo("Starting flashing...")
         l = [FLASH]
         l.extend(FLASHFLAGS)
-        l.extend(["-w", self.main_out])
+        l.extend(["-w", self.mainOut])
 
         if subprocess.call(l) != 0:
             printErrAndQuit("Non-zero returned during flash")
@@ -204,7 +204,7 @@ class Maker:
 
 def main():
     #Colorama initialization
-    c_init(autoreset=True)
+    cInit(autoreset=True)
 
     #if 0 parameteres are passed, then use all deafult vaules
     if len(sys.argv) == 1:
@@ -223,7 +223,7 @@ def main():
     #if 2 parameters are passed, we assume that the first is
     #the target, the second is the main_src
     elif len(sys.argv) == 3:
-        maker = Maker(main_src=sys.argv[2])
+        maker = Maker(mainSrc=sys.argv[2])
         maker.execTarget(sys.argv[1])
 
 
