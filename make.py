@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
 import re
 import sys
 import shutil
 import subprocess
+from os import mkdir, makedirs, rename
 from colorama import init as c_init, Fore
-from os.path import abspath, normpath, commonpath, basename, dirname, splitext
+from os.path import abspath, normpath, commonpath, basename, dirname, splitext, exists
 
 #<configuration>
 CPU_F = "2000000UL"
@@ -38,7 +38,10 @@ def printUsageAndQuit(targets):
 replaceExtension = lambda file, ext: splitext(file)[0] + "." + ext
 
 
-def extractHeaders(filename):
+def getUsedFilesFromFile(filename):
+    if not exists(filename):
+        return set()
+
     with open(filename, "r") as f:
         content = f.read()
 
@@ -50,12 +53,51 @@ def extractHeaders(filename):
 
     #regex to parse #include "something.h"
     pattern = re.compile(r'#include\s*"\s*([^"]+\.[Hh])\s*"')
-    s = set([normpath(path + item.lower()) for item in re.findall(pattern, content)])
+    #h = set of used headers
+    h = set([normpath(path + item.lower()) for item in re.findall(pattern, content)])
 
-    for item in s:
-        s = s | extractHeaders(item)    #recursion
+    c = set()
 
-    return s
+    for f in h:
+        c_file = replaceExtension(f, "c")
+
+        if exists(c_file):  #there exists an associated .c file?
+            c.add(c_file)
+            
+    return h | c
+
+
+def getUsedCFiles(startingFile):
+    printVerb("Generating used files list...")
+    startingFile = abspath(startingFile)
+    currentFile = startingFile
+    completed = set()       #analyzed files
+    toBeAnalyzed = set()    #files to be analyzed
+    
+    while True:
+        completed.add(currentFile)  #analyze the file
+        if currentFile in toBeAnalyzed:
+            printInfo("Found " + currentFile)
+            toBeAnalyzed.remove(currentFile)
+
+        #get used files
+        s = getUsedFilesFromFile(currentFile)
+    
+        #eventually add new items to toBeAnalyzed
+        for f in s:
+            if f not in completed:
+                toBeAnalyzed.add(f)
+        
+        if len(toBeAnalyzed) == 0: #no more file?
+            break
+        else:
+            currentFile = toBeAnalyzed.pop()
+
+    assert len(toBeAnalyzed) == 0
+    printVerb("Done generating used files list")
+
+    #now we can strip all .h files
+    return [item for item in completed if item.endswith(".c") and item != startingFile]
 
 
 class Maker:
@@ -91,44 +133,27 @@ class Maker:
     def _mainTarget(self):
         printInfo("Starting compilation...")
         printVerb("Extracting used headers")
-        used_h = extractHeaders(self.main_src)   #headers used by the user
-
-        #now every used .h (even in the stm library) should be in used_h:
-        #we need to find if there's a corresponding .c
+        used_c = getUsedCFiles(self.main_src)
+        #now every used .c (even in the stm library) should be in used_c
 
         rel_list = []
 
-        #workaround, this might need to be fixed. Since a c of an header
-        #might contain an include, also that include need to be parsed
-        tmp_set = set() #set can't be changed during iteration
+        for c_file in used_c:
+            printVerb("Compiling " + c_file)
+            out_rel = normpath(self.out_dir + "/" + c_file[len(commonpath([self.out_dir, c_file])):])
+            out_rel = replaceExtension(out_rel, "rel")
+            out_path = normpath(dirname(out_rel))
 
-        for h in used_h:
-            c_file = replaceExtension(h, "c")
+            makedirs(out_path, exist_ok=True)
 
-            if os.path.exists(c_file):
-                tmp_set |= extractHeaders(c_file)
+            l=[CC]
+            l.extend(CFLAGS)
+            l.extend(["-c", c_file, "-o", out_rel])
 
-        used_h |= tmp_set
+            if subprocess.call(l) != 0:
+                printErrAndQuit("Non-zero returned during compilation of " + c_file)
 
-        for h in used_h:
-            c_file = replaceExtension(h, "c")
-
-            if os.path.exists(c_file):
-                printVerb("Compiling " + c_file)
-                out_rel = normpath(self.out_dir + "/" + c_file[len(commonpath([self.out_dir, c_file])):])
-                out_rel = replaceExtension(out_rel, "rel")
-                out_path = normpath(dirname(out_rel))
-
-                os.makedirs(out_path, exist_ok=True)
-
-                l=[CC]
-                l.extend(CFLAGS)
-                l.extend(["-c", c_file, "-o", out_rel])
-
-                if subprocess.call(l) != 0:
-                    printErrAndQuit("Non-zero returned during compilation of " + c_file)
-
-                rel_list.append(out_rel)
+            rel_list.append(out_rel)
 
         #ok, every non main file is compiled, now compile main.c
         l = [CC]
@@ -138,7 +163,7 @@ class Maker:
 
         #BUG correction: if we never enter in the for loop above, out_dir
         #doesn't exist. Let's make it
-        os.makedirs(self.out_dir, exist_ok=True)
+        makedirs(self.out_dir, exist_ok=True)
 
         if subprocess.call(l) != 0:
             printErrAndQuit("Non-zero returned during compilation of " + self.main_src)
@@ -154,14 +179,14 @@ class Maker:
             tempFile = self.main_out.split("/")
             tempFile.insert(len(tempFile)-1, "..")
             tempFile = normpath("/".join(tempFile))
-            os.rename(self.main_out, tempFile)
+            rename(self.main_out, tempFile)
 
         printVerb("Removing " + self.out_dir)
         shutil.rmtree(self.out_dir, ignore_errors=True)
 
         if leaveMain:
-            os.mkdir(self.out_dir)
-            os.rename(tempFile, self.main_out)
+            mkdir(self.out_dir)
+            rename(tempFile, self.main_out)
 
         printInfo("Done cleaning")
         

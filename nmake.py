@@ -32,8 +32,9 @@ def getUsedFilesFromFile(filename):
     return h | c
 
 
-def getUsedFilesDict(startingFile):
-    currentFile = abspath(startingFile)
+def getUsedCFiles(startingFile):
+    startingFile = abspath(startingFile)
+    currentFile = startingFile
     completed = set()       #analyzed files
     toBeAnalyzed = set()    #files to be analyzed
     
@@ -57,12 +58,12 @@ def getUsedFilesDict(startingFile):
 
     assert len(toBeAnalyzed) == 0
 
-    return completed
-
+    #now we can strip all .h files
+    return [item for item in completed if item.endswith(".c") and item != startingFile]
 
 
 def main():
-    for f in getUsedFilesDict("./examples/mfrc522/main.c"):
+    for f in getUsedCFiles("./examples/mfrc522/main.c"):
         print(f)
     
     #print("h")
