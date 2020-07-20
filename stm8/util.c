@@ -10,3 +10,11 @@ inline void delay(uint16_t ms){
     while(t)
         t--;
 }
+
+inline void uid_read(uint8_t *data){
+    uint8_t i;
+
+    for(i=0; i<UID_LEN; i++){
+        data[i] = *(UID_PTR + i);
+    }
+}
