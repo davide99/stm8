@@ -177,6 +177,7 @@ class Maker:
 
     def _clean_target(self, leave_main=False):
         print_info("Cleaning...")
+        temp_file = ""
 
         if leave_main:
             print_verb("Preseving " + self.main_out)

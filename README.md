@@ -22,7 +22,8 @@ Contact me [@davide99](https://telegram.me/davide99)
 
 ## ST-Link Pinout
 
-ST-Link V2 clones usually come in two flavours, the ones with the metal enclosing and the ones by Baite in green plastic enclosing. They are both perfectly fine, despite the second one support also the JTAG protocol (besides SWIM and SWD)
+ST-Link V2 clones usually come in two flavours, the ones with the metal enclosing and the ones by Baite in green plastic
+enclosing. They are both perfectly fine, despite the second one support also the JTAG protocol (besides SWIM and SWD)
 
 ![pinout_stlink](misc/pinout_stlink.png)
 
@@ -60,3 +61,7 @@ ST-Link V2 clones usually come in two flavours, the ones with the metal enclosin
 | SWIM          | 5             | 5             |
 | GND           | 7             | 3             |
 | NRST          | 9             | 1             |
+
+## CLion support
+This repository is CLion-ready. After importing the repository the `Build & Flash` target is available. Just open the
+main file you want to flash and hit the `►` button.
