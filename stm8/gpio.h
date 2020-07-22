@@ -38,7 +38,7 @@
 #define PD_ISR 6
 
 //Interrupt config registers
-#define EXTI_CR1 __RMM(0x0A0)
-#define EXTI_CR2 __RMM(0x0A1)
+#define EXTI_CR1 __RMM(0xA0)
+#define EXTI_CR2 __RMM(0xA1)
 
 #endif

@@ -3,7 +3,7 @@
 #include "../../stm8/spi.h"
 #include "../../stm8/util.h" //sleep
 
-#define SLAVE_SELECT()  (PC_ODR &= ~SHIFTL8(MFRC522_CS_PIN))
+#define SLAVE_SELECT()  (PC_ODR &= NEG8(SHIFTL8(MFRC522_CS_PIN)))
 #define SLAVE_RELEASE() (PC_ODR |= SHIFTL8(MFRC522_CS_PIN))
 
 inline uint8_t PCD_GetVersion(){
@@ -65,7 +65,7 @@ void PCD_ReadRegisterMany(uint8_t reg, uint8_t count, uint8_t *values, uint8_t r
 		// Read value and tell that we want to read the same address again.
 		uint8_t value = spi_transfer(reg);
 		// Apply mask to both current value of values[0] and the new data in value.
-		values[0] = (values[0] & ~mask) | (value & mask);
+		values[0] = (values[0] & NEG8(mask)) | (value & mask);
 		index++;
     }
 
@@ -83,7 +83,7 @@ void PCD_ClearRegisterBitMask(uint8_t reg, uint8_t mask){
     uint8_t tmp;
 
     tmp = PCD_ReadRegister(reg);
-    PCD_WriteRegister(reg, tmp & (~mask));
+    PCD_WriteRegister(reg, tmp & NEG8(mask));
 }
 
 void PCD_SetRegisterBitMask(uint8_t reg, uint8_t mask){
@@ -96,7 +96,7 @@ void PCD_SetRegisterBitMask(uint8_t reg, uint8_t mask){
 static inline void PCD_Reset(){
     uint8_t count;
     PCD_WriteRegister(CommandReg, PCD_SoftReset);
-    
+
     count = 0;
     do {
         delay(50);
@@ -164,15 +164,14 @@ uint8_t PCD_CalculateCRC(
     uint8_t *data,      //< In: Pointer to the data to transfer to the FIFO for CRC calculation.
     uint8_t length,     //< In: The number of bytes to transfer.
     uint8_t *result) {  //< Out: Pointer to result buffer. Result is written to result[0..1], low byte first.
-        
+
     PCD_WriteRegister(CommandReg, PCD_Idle);          // Stop any active command.
     PCD_WriteRegister(DivIrqReg, 0x04u);              // Clear the CRCIRq interrupt request bit
     PCD_WriteRegister(FIFOLevelReg, 0x80u);           // FlushBuffer = 1, FIFO initialization
     PCD_WriteRegisterMany(FIFODataReg, length, data); // Write data to the FIFO
     PCD_WriteRegister(CommandReg, PCD_CalcCRC);       // Start the calculation
-    
+
     // Wait for the CRC calculation to complete. Each iteration of the while-loop takes 17.73μs.
-    // TODO check/modify for other architectures than Arduino Uno 16bit
 
     for (uint16_t i = 5000; i > 0; i--) {
         // DivIrqReg[7..0] bits are: Set2 reserved reserved MfinActIRq reserved CRCIRq reserved reserved
@@ -219,18 +218,18 @@ uint8_t PCD_CommunicateWithPICC(
     if (command == PCD_Transceive) {
         PCD_SetRegisterBitMask(BitFramingReg, 0x80u);       //StartSend=1, transmission of data starts
     }
-    
+
     // Wait for the command to complete.
     // In PCD_Init() we set the TAuto flag in TModeReg. This means the timer automatically starts when the PCD stops transmitting.
     // Each iteration of the do-while-loop takes 17.86μs.
-    // TODO check/modify for other architectures than Arduino Uno 16bit
+
     uint16_t i;
     for (i = 20000; i > 0; i--) {
         uint8_t n = PCD_ReadRegister(ComIrqReg);   // ComIrqReg[7..0] bits are: Set1 TxIRq RxIRq IdleIRq HiAlertIRq LoAlertIRq ErrIRq TimerIRq
         if (n & waitIRq) {                  // One of the interrupts that signal success has been set.
             break;
         }
-        if (n & 0x01) {                     // Timer interrupt - nothing received in 25ms
+        if (n & 0x01u) {                    // Timer interrupt - nothing received in 25ms
             return STATUS_TIMEOUT;
         }
     }
@@ -238,16 +237,16 @@ uint8_t PCD_CommunicateWithPICC(
     if (!i) {
         return STATUS_TIMEOUT;
     }
-    
+
     // Stop now if any errors except collisions were detected.
     // ErrorReg[7..0] bits are: WrErr TempErr reserved BufferOvfl CollErr CRCErr ParityErr ProtocolErr
     uint8_t errorRegValue = PCD_ReadRegister(ErrorReg);
     if (errorRegValue & 0x13u) {  // BufferOvfl ParityErr ProtocolErr
         return STATUS_ERROR;
     }
-  
+
     uint8_t _validBits = 0;
-    
+
     // If the caller wants data back, get it from the MFRC522.
     if (backData && backLen) {
         uint8_t n = PCD_ReadRegister(FIFOLevelReg); // Number of bytes in the FIFO
@@ -264,7 +263,7 @@ uint8_t PCD_CommunicateWithPICC(
             *validBits = _validBits;
         }
     }
-    
+
     // Tell about collisions
     if (errorRegValue & 0x08u) {     // CollErr
         return STATUS_COLLISION;
@@ -299,7 +298,7 @@ uint8_t PCD_CommunicateWithPICC(
 uint8_t PICC_HaltA() {
     uint8_t result;
     uint8_t buffer[4];
-    
+
     // Build command buffer
     buffer[0] = PICC_CMD_HLTA;
     buffer[1] = 0;
@@ -308,7 +307,7 @@ uint8_t PICC_HaltA() {
     if (result != STATUS_OK) {
         return result;
     }
-    
+
     // Send the command.
     // The standard says:
     //		If the PICC responds with any modulation during a period of 1 ms after the end of the frame containing the
@@ -522,13 +521,13 @@ int8_t PICC_ReadCardSerial(MFRC522_Uid* uid){
 }
 
 inline void PCD_InitInterrupt(){
-    PD_DDR &= ~SHIFTL8(MFRC522_IRQ_PIN);    //input
-    PD_CR1 |=  SHIFTL8(MFRC522_IRQ_PIN);    //pullup
-    PD_CR2  =  SHIFTL8(MFRC522_IRQ_PIN);    //enable external interrupt
+    PD_DDR &= NEG8(SHIFTL8(MFRC522_IRQ_PIN));    //input
+    PD_CR1 |= SHIFTL8(MFRC522_IRQ_PIN);    //pullup
+    PD_CR2  = SHIFTL8(MFRC522_IRQ_PIN);    //enable external interrupt
 
-    EXTI_CR1 |= 0b10000000; //<=+
-    EXTI_CR1 &= 0b10111111; //<== interrupt on falling edge only
-    EXTI_CR2 &= 0b11111011; //<== interrupt sensitivity on falling edge
+    EXTI_CR1 |= 0b10000000u; //<=+
+    EXTI_CR1 &= 0b10111111u; //<== interrupt on falling edge only
+    EXTI_CR2 &= 0b11111011u; //<== interrupt sensitivity on falling edge
 
     PCD_WriteRegister(ComIEnReg, 0xA0u); //enable interrupt
 

@@ -11,17 +11,17 @@
 
 
 //Registers' bits
-#define SPI_CR1_MSTR 0x04
-#define SPI_CR1_SPE  0x40
-#define SPI_CR2_SSM  0x02 //<<CS managed in SW
-#define SPI_CR2_SSI  0x01
-#define SPI_SR_BSY   0x80
-#define SPI_SR_TXE   0x02
-#define SPI_SR_RXNE  0x01
+#define SPI_CR1_MSTR SHIFTL8(2)
+#define SPI_CR1_SPE  SHIFTL8(6)
+#define SPI_CR2_SSM  SHIFTL8(1) //<<CS managed in SW
+#define SPI_CR2_SSI  SHIFTL8(0)
+#define SPI_SR_BSY   SHIFTL8(7)
+#define SPI_SR_TXE   SHIFTL8(1)
+#define SPI_SR_RXNE  SHIFTL8(0)
 
 
 void    spi_begin_transaction();
-uint8_t spi_transfer(uint8_t);
+uint8_t spi_transfer(uint8_t data);
 void    spi_end_transaction();
 
 

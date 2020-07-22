@@ -7,7 +7,7 @@
 #define UID_PTR ((volatile uint8_t *)(0x4865u))
 #define UID_LEN 12u
 
-void delay(uint16_t);
+void delay(uint16_t ms);
 void uid_read(uint8_t *data);
 
 #endif

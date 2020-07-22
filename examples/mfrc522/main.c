@@ -6,11 +6,6 @@
 
 volatile int8_t flag;
 
-int putchar(int c){
-    uart1_write(c);
-    return c;
-}
-
 void isr_port_d(void) __interrupt(PD_ISR){
     if(!(PD_IDR & SHIFTL8(4u)))
         flag = 1;
